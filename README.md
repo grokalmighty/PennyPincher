@@ -1,0 +1,2 @@
+# PennyPincher
+Personal finance management
