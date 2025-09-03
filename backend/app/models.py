@@ -45,3 +45,17 @@ class MarketSignal(Base):
     month = Column(String)
     category = Column(String)
     yoy = Column(Float)
+
+
+class UserCategory(Base):
+    __table__name = "user_categories"
+    id = Column(Integer, index=True)
+    name = Column(String)
+    parent_preset = Column(String)
+
+class MerchantRule(Base):
+    __table__name = "merchant_rules"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, index=True)
+    merchant_pattern = Column(String)
+    user_category_id = Column(Integer, ForeignKey("user_categories.id"))
