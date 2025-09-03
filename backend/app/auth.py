@@ -7,7 +7,7 @@ ALGO = "HS256"
 """Create JWT for given user_id"""
 def make_token(user_id: int) -> str:
     payload = {
-        "sub": str(user_id),
+        "sub": str(user_id), # Token must be a string 
         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)
     }
 
@@ -23,5 +23,5 @@ def get_user_id(authorization: str = Header(None)) -> int:
         return int(payload["sub"])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+    except Exception:
+        raise HTTPException(status_code=401, detail=f"Invalid token")
