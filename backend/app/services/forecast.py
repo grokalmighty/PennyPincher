@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
-from dateuitl.relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta
 
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
@@ -54,9 +54,7 @@ def _make_feedback(category: str, actual: float, forecast: float, mean_hist: flo
         )
     if forecast and actual <= forecast * 0.75:
         saved = forecast - actual
-        return (
-            f"Nice! {category} came in ${saved:0.f} under forecast this month."
-        )
+        return f"Nice! {category} came in ${saved:0.f} under forecast this month."
     if mean_hist and actual > mean_hist * 1.2:
         bump = actual - mean_hist
         return f"{category} is trending high (+{bump:.0f} vs typical). A small adjustment could help."
@@ -71,16 +69,11 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
     try:
         prev_month = _prev_month_str(month)
         cpi_map = cpi_map_for_month(db, month) or {}
-        actuals = dict(spend_by_preset(db, user_id=user_id, start=None, end=None)) \
-            if False else spend_by_preset
-        
-        actuals = spend_by_preset(db, user_id=user_id, start=None, end=None)
-        actuals =  spend_by_preset(db, user_id=user_id, month=month)
-
-        last_month_actuals = spend_by_preset(db, user_id=user_id, month=prev_month)
+        actuals = spend_by_preset(user_id, month) 
+        last_month_actuals = spend_by_preset(user_id, prev_month)
 
         N = 6
-        history_by_preset = spend_last_n_months_by_preset(db, user_id=user_id, month=month, n=N)
+        history_by_preset = spend_last_n_months_by_preset(user_id, month, n=N)
 
         rows: list[dict] = []
 
@@ -93,10 +86,8 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
             actual = float(actuals.get(preset, 0.0) or 0.0)
 
             history_series = history_by_preset.get(preset, [])[:]
-            if history_series and len(history_series) >= 1:
-                maybe_current = history_series[-1]
-                if abs(float(maybe_current) - actual) < 1e-6:
-                    history_series = history_series[:-1]
+            if history_series and abs(float(history_series[-1]) - actual) < 1e-6:
+                history_series = history_series[:-1]
 
             anomaly = _iforest_anomaly(history_series, actual)
             mean_hist = (sum(history_series) / len(history_series)) if history_series else None
