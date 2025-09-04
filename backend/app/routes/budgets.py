@@ -1,17 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import and_
 from app.auth import get_user_id
 from app.db import SessionLocal
 from app.models import Budget
+from typing import Literal
 
 router = APIRouter()
 
 class BudgetUpsert(BaseModel):
-    month: str
+    month: str = Field(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
     category: str
     limit_amount: float
-    priority: str | None = None
+    priority: Literal["fixed", "flex"] | None = None
 
 @router.get("/budgets", tags=["budgets"])
 def list_budgets(
