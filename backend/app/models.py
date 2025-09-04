@@ -3,13 +3,13 @@ from sqlalchemy.orm import relationship
 from .db import Base
 
 class User(Base):
-    __table__name = "users"
+    __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     password_hash = Column(String)
 
 class Account(Base):
-    __table__name = "accounts"
+    __tablename__ = "accounts"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     issuer = Column(String)
@@ -19,7 +19,7 @@ class Account(Base):
     user = relationship("User")
 
 class Transaction(Base):
-    __table__name = "transactions"
+    __tablename__ = "transactions"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
     account_id = Column(Integer)
@@ -32,7 +32,7 @@ class Transaction(Base):
     user_category = Column(String, nullable=True)
 
 class Budget(Base):
-    __table__ = "budgets"
+    __tablename__ = "budgets"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
     month = Column(String)
@@ -49,13 +49,14 @@ class MarketSignal(Base):
 
 
 class UserCategory(Base):
-    __table__name = "user_categories"
-    id = Column(Integer, index=True)
+    __tablename__ = "user_categories"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
     name = Column(String)
     parent_preset = Column(String)
 
 class MerchantRule(Base):
-    __table__name = "merchant_rules"
+    __tablename__= "merchant_rules"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
     merchant_pattern = Column(String)
