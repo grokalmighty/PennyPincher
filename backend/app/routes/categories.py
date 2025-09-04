@@ -25,6 +25,15 @@ def create_user_category(payload: NewCategory, user_id: int = Depends(get_user_i
         if not parent:
             raise HTTPException(400, "parent_preset required")
         
+        # Duplicates
+        exists = db.query(UserCategory).filter_by(
+            user_id=user_id,
+            parent_preset=parent,
+            name=sub
+        ).first()
+        if exists:
+            raise HTTPException(409, "Category already exists under this preset")
+        
         # New user subcategory
         uc = UserCategory(user_id=user_id, name=sub, parent_preset=parent)
         db.add(uc); db.flush()
