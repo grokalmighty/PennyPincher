@@ -5,6 +5,7 @@ import pandas as pd
 from app.auth import get_user_id
 from app.db import SessionLocal, Base, ENGINE
 from app.models import User, Account, Transaction, MarketSignal
+from app.services.classify import classify_on_ingest
 
 router = APIRouter()
 
@@ -74,6 +75,8 @@ def upload_transactions(
                 user_category=None
             )
             db.add(tx); rows += 1
+            
+            classify_on_ingest(db, user_id, tx)
 
         db.commit()
     finally:

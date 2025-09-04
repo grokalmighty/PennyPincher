@@ -1,81 +1,96 @@
 import re
-from typing import Dict, Tuple
-from sqlalchemy import and_
-from app.db import SessionLocal
-from app.models import MerchantRule, UserCategory, Transaction
+from __future__ import annotatoins
+from typing import Dict, Tuple, Iterable, Optional, List
+from sqlalchemy.orm import Session
+from app.models import Transaction, TxnOverride, CompanyRule, MerchantRule
 
-def _compile_rules(db, user_id: int):
-    rows = (
-        db.query(MerchantRule, UserCategory)
-          .join(UserCategory, MerchantRule.user_category_id == UserCategory.id)
-          .filter(MerchantRule.user_id == user_id)
-          .all()
+_company_clean = re.compile(r"[^a-z0-9]+")
+def canonicalize(name: Optional[str]) -> str:
+    return _company_clean.sub ("", (name or "").lower()).strip()
+
+def load_compiled_regex_rules(db: Session, user_id: int) -> List[Tuple[re.Pattern, str, str]]:
+    rules = (
+        db.query(MerchantRule)
+        .filter(MerchantRule.user_id == user_id)
+        .order_by(MerchantRule.priority.desc())
+        .all()
     )
-    compiled = []
-    for mr, uc in rows:
+    out: List[Tuple[re.Pattern, str, str]] = []
+    for r in rules:
         try:
-            pat = re.compile(mr.merchant_pattern, re.I)
-            compiled.append((pat, uc.name, uc.parent_preset))
+            pat = re.compile(r.pattern, re.IGNORECASE)
+            out.append((pat, r.user_category, r.parent_preset))
         except re.error:
             continue
-    return compiled
+    return out
 
-def apply_user_rules(user_id: int, commit: bool = True):
-    db = SessionLocal()
-    try: 
-        rules = _compile_rules(db, user_id)
-        if not rules:
-            return {"reclassified": 0, "considered": 0, "rules": 0}
-        
-        # Only candidates without a user_category
-        candidates = (
-            db.query(Transaction)
-              .filter(
-                  and_(
-                      Transaction.user_id == user_id,
-                      Transaction.user_category.is_(None)
-                  )
-              ).all()
+def apply_single_classification(
+        db: Session,
+        user_id: int,
+        tx: Transaction,
+        compiled_regex_rules: List[Tuple[re.Pattern, str, str]] | None = None,
+) -> Optional[str]:
+    # Explicit per-transaction override
+    ov = (
+        db.query(TxnOverride)
+        .filter(TxnOverride.user_id == user_id, TxnOverride.txn_id == tx.id)
+        .first()
+    )
+    if ov:
+        return ov.category
+    
+    # Company rule 
+    key = canonicalize(tx.merchant_alias or tx.merchant_norm or "")
+    if key:
+        cr = (
+            db.query(CompanyRule)
+            .filter(CompanyRule.user_id == user_id, CompanyRule.company == key)
+            .first()
         )
-
-        considered = 0
-        changed = 0
-        for t in candidates:
-            considered += 1
-            merch = t.merchant_norm or ""
-            preset = t.preset_category or ""
-            for pat, subcat, parent in rules:
-                if preset == parent and pat.search(merch):
-                    t.user_category = subcat
-                    changed += 1
-                    break
+        if cr:
+            return cr.category
+    
+    # Regex rulesssss
+    if compiled_regex_rules:
+        mnorm = tx.merchant_norm or ""
+        parent = tx.preset_category or ""
+        for pat, subcat, parent_preset in compiled_regex_rules:
+            if parent == parent_preset and pat.search(mnorm):
+                return subcat
         
-        if changed:
-            db.commit()
+    # fallback
+    return None
 
-        return {"reclassified": changed, "considered": considered, "rules": len(rules), "dry_run": not commit}
-    finally:
-        db.close()
-
-def review_queue(user_id: int, limit: int=100):
-    db = SessionLocal()
-    try:
-        rows = (
+# Batch classification
+def classify_batch_for_user(
+    db: Session,
+    user_id: int,
+    txns: Iterable[Transaction] | None = None,
+) -> Dict[str, int]:
+    if txns is None:
+        txns = (
             db.query(Transaction)
-              .filter(and_(
-                  Transaction.user_id == user_id,
-                  Transaction.user_category.is_(None)
-              ))
-              .order_by(Transaction.posted_at.desc())
-              .limit(limit)
-              .all()
+            .filter(Transaction.user_id == user_id)
+            .order_by(Transaction.date.asc())
+            .all()
         )
-        return [{
-            "id": t.id,
-            "date": t.posted_at.isoformat() if t.posted_at else None,
-            "merchant": t.merchant_norm,
-            "preset": t.preset_category,
-            "amount": t.amount,
-        } for t in rows]
-    finally:
-        db.close()
+    
+    rules = load_compiled_regex_rules(db, user_id=user_id)
+    considered = reclassified = 0 
+
+    for tx in txns:
+        considered += 1 
+        chosen = apply_single_classification(db, user_id, tx, rules)
+        if chosen and tx.user_category != chosen:
+            tx.user_category = chosen
+            reclassified += 1
+    
+    db.commit()
+    return {"considered": considered, "reclassified": reclassified}
+
+# Ingest helper
+def classify_on_ingest(db: Session, user_id: int, tx: Transaction) -> None:
+    rules = load_compiled_regex_rules(db, user_id=user_id)
+    chosen = apply_single_classification(db, user_id, tx, rules)
+    if chosen:
+        tx.user_category = chosen
