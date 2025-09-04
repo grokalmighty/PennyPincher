@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel
 from app.auth import get_user_id
 from app.db import SessionLocal
 from app.models import UserCategory, MerchantRule, Transaction, CompanyRule
 from sqlalchemy import func
+from typing import Optional
 import re
 
 PRESETS = [
@@ -183,5 +184,73 @@ def delete_user_category(cat_id: int, user_id: int = Depends(get_user_id)):
             "migrated_transactions": int(affected_txn_count),
             "deleted_company_rules": int(deleted_company_rules)
         }
+    finally:
+        db.close()
+
+@router.get("/categories/{preset}")
+def get_single_preset(
+    preset: str = Path(..., description="Preset key, e.g. 'food_drink'"),
+    include_unsorted: bool = Query(False, description="If true, include recent unsorted transactions for this preset"),
+    limit: int = Query(50, ge=1, le=500, description="Max unsorted transactions to return when include_unsorted=true"),
+    user_id: int = Depends(get_user_id),
+):
+    preset_map = {p["key"]: p for p in PRESETS}
+    if preset not in preset_map:
+        raise HTTPException(status_code=404, detail=f"Unknown preset '{preset}'")
+
+    db = SessionLocal()
+    try:
+        subs = (
+            db.query(UserCategory)
+              .filter(UserCategory.user_id == user_id, UserCategory.parent_preset == preset)
+              .all()
+        )
+        subs_out = [{
+            "id": uc.id,
+            "name": uc.name,
+            "category": f"{uc.parent_preset}:{uc.name}",
+        } for uc in subs]
+
+        unsorted_count = (
+            db.query(func.count(Transaction.id))
+              .filter(
+                  Transaction.user_id == user_id,
+                  Transaction.preset_category == preset,
+                  Transaction.user_category.is_(None)
+              )
+              .scalar()
+        )
+
+        result = {
+            "key": preset,
+            "label": preset_map[preset].get("label", preset.title()),
+            "unsorted_count": int(unsorted_count or 0),
+            "subcategories": sorted(subs_out, key=lambda x: x["name"].lower()),
+        }
+
+        if include_unsorted:
+            rows = (
+                db.query(Transaction)
+                  .filter(
+                      Transaction.user_id == user_id,
+                      Transaction.preset_category == preset,
+                      Transaction.user_category.is_(None)
+                  )
+                  .order_by(Transaction.posted_at.desc(), Transaction.id.desc())
+                  .limit(limit)
+                  .all()
+            )
+            result["recent_unsorted"] = [
+                {
+                    "id": t.id,
+                    "date": t.posted_at,
+                    "merchant": t.merchant_norm,
+                    "amount": t.amount,
+                    "currency": t.currency,
+                    "preset": t.preset_category,
+                } for t in rows
+            ]
+
+        return result
     finally:
         db.close()
