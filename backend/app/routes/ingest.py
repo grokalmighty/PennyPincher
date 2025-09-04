@@ -24,7 +24,7 @@ REQUIRED_TX_COLS = {
     "amount",
     "currency",
     "merchant_alias",
-    "category",
+    "preset_category",
     "account_alias",
     "issuer",
     "network",
@@ -70,7 +70,8 @@ def upload_transactions(
                 amount=float(r.amount), currency=str(r.currency),
                 merchant_norm=str(r.merchant_alias),
                 mcc=None,
-                canonical_category=str(r.category)
+                preset_category=str(r.preset_category),
+                user_category=None
             )
             db.add(tx); rows += 1
 

@@ -20,7 +20,7 @@ class Account(Base):
 
 class Transaction(Base):
     __table__name = "transactions"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
     account_id = Column(Integer)
     posted_at = Column(Date)
@@ -28,11 +28,12 @@ class Transaction(Base):
     currency = Column(String)
     merchant_norm = Column(String)
     mcc = Column(String, nullable=True)
-    canonical_category = Column(String)
+    preset_category = Column(String)
+    user_category = Column(String, nullable=True)
 
 class Budget(Base):
     __table__ = "budgets"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
     month = Column(String)
     category = Column(String)

@@ -12,7 +12,7 @@ class NewCategory(BaseModel):
     parent_preset: str
     seed_merchants_regex: str | None = None
 
-@router.post("/categories"):
+@router.post("/categories")
 def create_user_category(payload: NewCategory, user_id: int = Depends(get_user_id)):
     db = SessionLocal()
     try:
