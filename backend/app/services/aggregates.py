@@ -58,7 +58,12 @@ def spend_by_subcat(user_id: int, month: str, parent_preset: str) -> dict[str, f
             .group_by(Transaction.user_category)
             .all()
         )
-        return {r.sub: -float(r.sum_amt or 0.0) for r in rows}
+        out: dict[str, float] = {}
+        for r in rows:
+            full = r.sub or ""
+            sub_only = full.split(":", 1)[1] if ":" in full else full 
+            out[sub_only] = -float(r.sum_amt or 0.0)
+        return out
     finally:
         db.close()
 
@@ -74,11 +79,11 @@ def spend_last_n_months_by_preset(user_id: int, month: str, n: int = 3) -> dict[
         months.append(f"{yy:04d}-{mm:02d}")
 
     # collect
-    series = {}
-    for mon in months:
+    series: dict[str, list[float]] = {}
+    for idx, mon in enumerate(months):
         sbp = spend_by_preset(user_id, mon)
-        for preset, amt in sbp.items():
+        for preset in sbp.keys():
             series.setdefault(preset, [0.0]*len(months))
         for preset in series.keys():
-            series[preset][months.index(mon)] = sbp.get(preset, 0.0)
+            series[preset][idx] = sbp.get(preset, 0.0)
     return series

@@ -100,7 +100,7 @@ def list_categories(user_id: int = Depends(get_user_id)):
         subs_by_preset = {}
         for uc in user_subs:
             subs_by_preset.setdefdault(uc.parent_preset, []).append({
-                "id": uc.idm
+                "id": uc.id,
                 "name": uc.name,
                 "category": f"{uc.parent_preset}:{uc.name}",
             })
