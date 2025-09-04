@@ -8,18 +8,20 @@ _company_clean = re.compile(r"[^a-z0-9]+")
 def canonicalize(name: Optional[str]) -> str:
     return _company_clean.sub ("", (name or "").lower()).strip()
 
-def load_compiled_regex_rules(db: Session, user_id: int) -> List[Tuple[re.Pattern, str, str]]:
+def load_compiled_regex_rules(db: Session, user_id: int):
+    from app.models import MerchantRule, UserCategory
     rules = (
-        db.query(MerchantRule)
+        db.query(MerchantRule, UserCategory)
+        .join(UserCategory, MerchantRule.user_category_id == UserCategory.id)
         .filter(MerchantRule.user_id == user_id)
-        .order_by(MerchantRule.priority.desc())
         .all()
     )
-    out: List[Tuple[re.Pattern, str, str]] = []
-    for r in rules:
+    out = []
+    for mr, uc in rules:
         try:
-            pat = re.compile(r.pattern, re.IGNORECASE)
-            out.append((pat, r.user_category, r.parent_preset))
+            pat = re.compile(mr.merchant_pattern, re.IGNORECASE)
+            full_key = f"{uc.parent_preset}:{uc.name}"
+            out.append((pat, full_key, uc.parent_preset))
         except re.error:
             continue
     return out
