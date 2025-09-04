@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends
-from .routes import auth, ingest, categories, classify, reports, coach, forecast, budgets
+from .routes import auth, ingest, categories, classify, reports, coach, forecast, budgets, goals
 from .auth import get_user_id
 
 
@@ -13,6 +13,7 @@ app.include_router(reports.router, tags=["reports"])
 app.include_router(coach.router, tags=["coach"])
 app.include_router(forecast.router, tags=["forecast"])
 app.include_router(budgets.router, tags=["budgets"])
+app.include_router(goals.router, tags=["goals"])
 
 @app.get("/healthz")
 def healthz():
