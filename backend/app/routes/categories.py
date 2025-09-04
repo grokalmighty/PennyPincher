@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.auth import get_user_id
 from app.db import SessionLocal
-from app.models import UserCategory, MerchantRule, Transaction
+from app.models import UserCategory, MerchantRule, Transaction, CompanyRule
+from sqlalchemy import func
 import re
 
 PRESETS = [
@@ -114,5 +115,73 @@ def list_categories(user_id: int = Depends(get_user_id)):
             })
         
         return {"presets": out}
+    finally:
+        db.close()
+
+@router.get("/transactions/unsorted")
+def get_unsorted(preset: str | None = None, user_id: int = Depends(get_user_id)):
+    db = SessionLocal()
+    try:
+        q = db.query(Transaction).filter(Transaction.user_id == user_id, Transaction.user_category.is_(None))
+        if preset:
+            q = q.filter(Transaction.preset_category == preset)
+        rows = q.order_by(Transaction.posted_at.desc(), Transaction.id.desc()).limit(200).all()
+        return [
+            {
+                "id": t.id,
+                "date": t.posted_at,
+                "merchant": t.merchant_norm,
+                "amount": t.amount,
+                "currency": t.currency,
+                "preset": t.preset_category,
+            } for t in rows
+        ]
+    finally:
+        db.close()
+
+@router.delete("/categories/{cat_id}")
+def delete_user_category(cat_id: int, user_id: int = Depends(get_user_id)):
+    db = SessionLocal()
+    try:
+        uc = (
+            db.query(UserCategory)
+              .filter(UserCategory.id == cat_id, UserCategory.user_id == user_id)
+              .first()
+        )
+        if not uc:
+            raise HTTPException(status_code=404, detail="Subcategory not found")
+
+        full_key = f"{uc.parent_preset}:{uc.name}"
+
+        affected_txn_count = (
+            db.query(func.count(Transaction.id))
+              .filter(Transaction.user_id == user_id, Transaction.user_category == full_key)
+              .scalar()
+        )
+
+        db.query(Transaction).filter(
+            Transaction.user_id == user_id,
+            Transaction.user_category == full_key
+        ).update({Transaction.user_category: None}, synchronize_session=False)
+
+        db.query(MerchantRule).filter(
+            MerchantRule.user_id == user_id,
+            MerchantRule.user_category_id == uc.id
+        ).delete(synchronize_session=False)
+
+        deleted_company_rules = db.query(CompanyRule).filter(
+            CompanyRule.user_id == user_id,
+            CompanyRule.category == full_key
+        ).delete(synchronize_session=False)
+
+        db.delete(uc)
+
+        db.commit()
+        return {
+            "status": "ok",
+            "deleted_category": full_key,
+            "migrated_transactions": int(affected_txn_count),
+            "deleted_company_rules": int(deleted_company_rules)
+        }
     finally:
         db.close()
