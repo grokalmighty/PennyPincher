@@ -20,7 +20,7 @@ def _compile_rules(db, user_id: int):
             continue
     return compiled
 
-def apply_user_rules(user_id: int):
+def apply_user_rules(user_id: int, commit: bool = True):
     db = SessionLocal()
     try: 
         rules = _compile_rules(db, user_id)
@@ -53,7 +53,7 @@ def apply_user_rules(user_id: int):
         if changed:
             db.commit()
 
-        return {"reclassified": changed, "considered": considered, "rules": len(rules)}
+        return {"reclassified": changed, "considered": considered, "rules": len(rules), "dry_run": not commit}
     finally:
         db.close()
 
