@@ -4,10 +4,7 @@ from dateutil.relativedelta import relativedelta
 
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
-from app.services.aggregates import (
-    spend_by_preset,
-    spend_last_n_months_by_preset,
-)
+from app.services.aggregates import spend_by_preset, spend_last_n_months_by_preset, personal_baseline, z_score
 from app.services.inherit import cpi_map_for_month
 
 try:
@@ -88,8 +85,12 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
             history_series = history_by_preset.get(preset, [])[:]
             if history_series and abs(float(history_series[-1]) - actual) < 1e-6:
                 history_series = history_series[:-1]
+            
+            stats = personal_baseline(history_series or [])
+            z = z_score(actual, stats.get("ema", 0.0), stats.get("std", 0.0))
 
             anomaly = _iforest_anomaly(history_series, actual)
+            anomaly = bool(anomaly or (abs(z) >= 2.0 and actual > (stats.get("ema") or 0)))
             mean_hist = (sum(history_series) / len(history_series)) if history_series else None
             feedback = _make_feedback(preset, actual, forecast, mean_hist)
 
@@ -100,7 +101,9 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
                 "forecast": round(forecast, 2),
                 "actual_spent": round(actual, 2),
                 "anomaly": bool(anomaly),
-                "feedback": feedback
+                "feedback": feedback,
+                "baseline_ema": round(stats.get("ema", 0.0), 2),
+                "z_score": round(z, 2)
             })
         return rows 
     finally:

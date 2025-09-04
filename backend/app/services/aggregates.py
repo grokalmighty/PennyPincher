@@ -107,12 +107,10 @@ def _ema_std(values: list[float], alpha: float = 0.3) -> float:
     return sqrt(max(var, 0.0))
 
 def personal_baseline(series: list[float]) -> dict:
-    """Given last N monthly spends for a category (old→new), return EMA stats."""
     ema = _ema(series, 0.3)
     s = _ema_std(series, 0.3)
     return {"ema": ema, "std": s, "upper": ema + 2*s, "lower": max(ema - 2*s, 0.0)}
 
 def z_score(current: float, ema: float, std: float) -> float:
-    if std <= 1e-6: 
-        return 0.0
+    if std <= 1e-6: return 0.0
     return (current - ema) / std
