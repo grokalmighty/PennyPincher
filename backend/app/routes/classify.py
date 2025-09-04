@@ -1,19 +1,17 @@
 from fastapi import APIRouter, Depends, Query
 from app.auth import get_user_id
-from app.services.classify import apply_user_rules, review_queue
+from app.db import SessionLocal
+from app.services.classify import classify_batch_for_user
 
 router = APIRouter()
 
-@router.post("/classify/apply-rules")
-def classify_now(
-    dry_run: bool = Query(False, description="If true, report counts but don't write."),
+@router.post("/classify/apply-rules", tags=["classify"])
+def apply_rules(
     user_id:int=Depends(get_user_id)
 ):
-    return apply_user_rules(user_id=user_id, commit=not dry_run)
-
-@router.get("/classify/review-queue")
-def classify_review_queue(
-    limit: int = Query(100, ge=1, le=1000),
-    user_id: int = Depends(get_user_id)
-):
-    return review_queue(user_id=user_id, limit=limit)
+    db = SessionLocal()
+    try:
+        out = classify_batch_for_user(db, user_id=user_id)
+        return {**out, "rules": "company+regex", "dry_run": False}
+    finally:
+        db.close()
