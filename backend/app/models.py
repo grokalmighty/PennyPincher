@@ -91,3 +91,13 @@ class CompanyRule(Base):
     category = Column(String, nullable=False)
     priority = Column(Integer, default=100)
     __table_args__ = (UniqueConstraint("user_id", "company", name="uix_user_company"),)
+    
+class PlannedContribution(Base):
+    __tablename__ = "planned_contributions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    month = Column(String, nullable=False) 
+    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    __table_args__ = (UniqueConstraint("user_id", "month", "goal_id", name="uix_user_month_goal"),)

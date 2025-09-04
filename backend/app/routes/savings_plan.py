@@ -46,7 +46,9 @@ def savings_plan(
 def apply_savings_plan(
     month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     spend_cap: float = Query(..., gt=0),
-    only_flex: bool = Query(False, description="If true, only update budgets whose priority is 'flex'"),
+    only_flex: bool = Query(False),
+    apply_goal_contributions: bool = Query(True, description="If true, write PlannedContribution rows"),
+    credit_to_goals: bool = Query(True, description="If true, add amounts to Goal.current_amount"),
     user_id: int = Depends(get_user_id),
 ):
     db = SessionLocal()
@@ -70,7 +72,7 @@ def apply_savings_plan(
                          priority=g.priority, active=g.active) for g in g_rows]
 
         plan = suggest_budgets(month, spend_cap, forecast, last, actual, prio_map, anomalies, goals)
-        suggested = plan["suggested_budgets"] 
+        suggested = plan["suggested_budgets"]
 
         changed = []
         for preset, new_limit in suggested.items():
@@ -106,6 +108,30 @@ def apply_savings_plan(
                 db.flush() 
                 changed.append({"id": row.id, "category": preset, "limit_amount": float(new_limit), "priority": row.priority or "flex"})
 
+        applied_contribs = []
+        if apply_goal_contributions and plan["savings_routing"]:
+
+            from app.models import PlannedContribution, Goal
+            for item in plan["savings_routing"]:
+                gid = int(item["goal_id"]); amt = float(item["amount"])
+                if amt <= 0:
+                    continue
+                row = (db.query(PlannedContribution)
+                         .filter(PlannedContribution.user_id==user_id,
+                                 PlannedContribution.month==month,
+                                 PlannedContribution.goal_id==gid)
+                         .first())
+                if row:
+                    row.amount = amt
+                else:
+                    row = PlannedContribution(user_id=user_id, month=month, goal_id=gid, amount=amt)
+                    db.add(row)
+                applied_contribs.append({"goal_id": gid, "amount": amt})
+
+                if credit_to_goals:
+                    g = db.query(Goal).filter(Goal.id==gid, Goal.user_id==user_id).first()
+                    if g:
+                        g.current_amount = float(_safe(g.current_amount) + amt)
         db.commit()
 
         return {
@@ -113,8 +139,10 @@ def apply_savings_plan(
             "applied_month": month,
             "only_flex": only_flex,
             "budgets_changed": changed,
-            "summary": plan["summary"],          
-            "savings_routing": plan["savings_routing"] 
+            "summary": plan["summary"],
+            "savings_routing": plan["savings_routing"],
+            "contributions_applied": applied_contribs if apply_goal_contributions else [],
+            "credited_to_goals": bool(credit_to_goals and apply_goal_contributions),
         }
     finally:
         db.close()
