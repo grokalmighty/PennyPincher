@@ -48,23 +48,25 @@ def create_user_category(payload: NewCategory, user_id: int = Depends(get_user_i
                                 user_category_id=uc.id))
         db.commit()
 
-        # Any transaction with preset=parent and merchant matching regex -> set user_category
+        # Backfilling transactions
+        changed = 0 
         if payload.seed_merchants_regex:
-            pattern = re.compile(payload.seed_merchants_regex, re.I)
+            try:
+                pattern = re.compile(payload.seed_merchants_regex, re.I)
+            except re.error:
+                raise HTTPException(400, "Invalid regex pattern")
+
             txs = db.query(Transaction).filter(
                 Transaction.user_id == user_id,
                 Transaction.preset_category == parent
             ).all()
-
-            changed = 0 
 
             for t in txs:
                 if pattern.search(t.merchant_norm or ""):
                     t.user_category = full_key
                     changed += 1
             db.commit()
-        else:
-            changed = 0
+
         return {"id": uc.id, "name": sub, "parent_preset": parent, "category": full_key, "backfilled": changed}
     finally:
         db.close()
