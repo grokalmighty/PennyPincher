@@ -1,12 +1,11 @@
-from sqlalchemy import func
-from app.db import SessionLocal
-from app.models import MarketSignal, Transaction, UserCategory, Budget
+from sqlalchemy.orm import Session
+from app.models import MarketSignal
 
-def get_cpi_map(db, month: str) -> dict[str, float]:
+def cpi_map_for_month(db, month: str) -> dict[str, float]:
     rows = db.query(MarketSignal.category, MarketSignal.yoy).filter(
         MarketSignal.month == month
     ).all()
-    return {cat: float(yoy or 0.0) for cat, yoy in rows}
+    return {cat: float(y or 0.0) for cat, y in rows}
 
 def effective_cpi_for(preset: str, cpi_map: dict[str, float]) -> float:
     return cpi_map.get(preset, 0.0)

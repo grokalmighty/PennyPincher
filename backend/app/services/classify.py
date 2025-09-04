@@ -1,5 +1,6 @@
-import re
 from __future__ import annotations
+
+import re
 from typing import Dict, Tuple, Iterable, Optional, List
 from sqlalchemy.orm import Session
 from app.models import Transaction, TxnOverride, CompanyRule, MerchantRule
