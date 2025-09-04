@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, and_
 from app.db import SessionLocal
 from app.models import Transaction
+from math import sqrt
 
 def month_range(month: str) -> tuple[date, date]:
     start = date.fromisoformat(month + "-01")
@@ -87,3 +88,31 @@ def spend_last_n_months_by_preset(user_id: int, month: str, n: int = 3) -> dict[
         for preset in series.keys():
             series[preset][idx] = sbp.get(preset, 0.0)
     return series
+
+def _ema(values: list[float], alpha: float = 0.3) -> float:
+    if not values: return 0.0
+    ema = values[0]
+    for v in values[1:]:
+        ema = alpha * v + (1 - alpha) * ema
+    return ema
+
+def _ema_std(values: list[float], alpha: float = 0.3) -> float:
+    if not values: return 0.0
+    mean = values[0]
+    var = 0.0
+    for v in values[1:]:
+        delta = v - mean
+        mean = mean + alpha * delta
+        var = (1 - alpha) * (var + alpha * delta * delta)
+    return sqrt(max(var, 0.0))
+
+def personal_baseline(series: list[float]) -> dict:
+    """Given last N monthly spends for a category (old→new), return EMA stats."""
+    ema = _ema(series, 0.3)
+    s = _ema_std(series, 0.3)
+    return {"ema": ema, "std": s, "upper": ema + 2*s, "lower": max(ema - 2*s, 0.0)}
+
+def z_score(current: float, ema: float, std: float) -> float:
+    if std <= 1e-6: 
+        return 0.0
+    return (current - ema) / std
