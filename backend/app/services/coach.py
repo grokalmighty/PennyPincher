@@ -1,4 +1,6 @@
-import app.db
+from app.db import SessionLocal
+from app.models import Budget
+from app.services.aggregates import spend_by_preset, spend_by_subcat 
 
 def parse_key(cat: str):
     if ":" in cat:
@@ -8,7 +10,7 @@ def parse_key(cat: str):
 
 def budgets_map(user_id: int, month: str):
     db = SessionLocal()
-    rows = db.query(Budget.category, Budget.limit_amount, Budget.priorty)\
+    rows = db.query(Budget.category, Budget.limit_amount, Budget.priority)\
              .filter(Budget.user_id==user_id, Budget.month==month).all()
     db.close()
 
@@ -43,6 +45,8 @@ def budget_status_inherited(user_id: int, month: str):
             "status": status
         })
 
+        sub_spend = {}
+        remaining_parent = limit
         # Show subcats if overrides exist
         if p in sub_overrides:
             sub_spend = spend_by_subcat(user_id, month, p)
