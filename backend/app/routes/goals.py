@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 from app.auth import get_user_id
 from app.db import SessionLocal
 from app.models import Goal, Budget
-from app.services.forecast import forecast_table
+from app.services.forecast import forecast_table, projected_goal_dates_p50_p80
 from app.services.aggregates import spend_by_preset
 from app.services.allocator import suggest_budgets, GoalRow
 
@@ -79,7 +79,7 @@ def _goal_timeline(today: date, name: str, current: float, target: float,
 
 @router.get("/goals/forecast", tags=["goals"])
 def goals_forecast(
-    month: str = Query(..., pattern=r"^\\d{4}-(0[1-9]|1[0-2])$"),
+    month: str = Query(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     spend_cap: float = Query(..., gt=0),
     monthly_savings_override: Optional[float] = Query(None),
     user_id: int = Depends(get_user_id),
@@ -87,9 +87,9 @@ def goals_forecast(
     db = SessionLocal()
     try:
         fc_rows = forecast_table(user_id=user_id, month=month)
-        forecast = {r["category"]: r["forecast"] for r in fc_rows}
-        actual   = {r["category"]: r["actual_spent"] for r in fc_rows}
-        anomalies= {r["category"]: bool(r["anomaly"]) for r in fc_rows}
+        forecast  = {r["category"]: r["forecast"] for r in fc_rows}
+        actual    = {r["category"]: r["actual_spent"] for r in fc_rows}
+        anomalies = {r["category"]: bool(r["anomaly"]) for r in fc_rows}
 
         y, m = map(int, month.split("-"))
         prev_month = (datetime(y, m, 1) - relativedelta(months=1)).strftime("%Y-%m")
@@ -100,23 +100,53 @@ def goals_forecast(
             if ":" not in b.category:
                 prio[b.category] = (b.priority or "flex").lower()
 
-        g_rows = db.query(Goal).filter(Goal.user_id == user_id, Goal.active == True).order_by(Goal.priority.asc()).all()
-        goals = [GoalRow(id=g.id, name=g.name, target=g.target_amount, current=g.current_amount,
-                         priority=g.priority, active=g.active) for g in g_rows]
+        g_rows = (
+            db.query(Goal)
+            .filter(Goal.user_id == user_id, Goal.active == True)
+            .order_by(Goal.priority.asc())
+            .all()
+        )
+        goals = [
+            GoalRow(
+                id=g.id, name=g.name, target=g.target_amount, current=g.current_amount,
+                priority=g.priority, active=g.active
+            ) for g in g_rows
+        ]
 
         alloc = suggest_budgets(month, spend_cap, forecast, last, actual, prio, anomalies, goals)
         saved = alloc["summary"]["saved"] if monthly_savings_override is None else float(monthly_savings_override)
 
         today = date.today()
+        monthly_net_series = [float(saved)] * 12 
         timelines = []
         for g in g_rows:
-            tl = _goal_timeline(today=today, name=g.name, current=g.current_amount,
-                                target=g.target_amount, monthly_contrib=saved, target_date=g.target_date)
-            tl.update({"goal_id": g.id, "planned_monthly_contribution": round(saved, 2)})
+            tl = _goal_timeline(
+                today=today,
+                name=g.name,
+                current=g.current_amount,
+                target=g.target_amount,
+                monthly_contrib=saved,
+                target_date=g.target_date,
+            )
+            unc = projected_goal_dates_p50_p80(
+                monthly_net_series=monthly_net_series,
+                current_balance=g.current_amount,
+                target_amount=g.target_amount,
+            )
+            tl.update({
+                "goal_id": g.id,
+                "planned_monthly_contribution": round(float(saved), 2),
+                "projected_date_p50": unc["p50"],
+                "projected_date_p80": unc["p80"],
+                "source_ref": {
+                    "method": "p50_p80_bootstrap_v1",
+                    "assumption": "monthly_net_series=[saved]*12"
+                },
+            })
             timelines.append(tl)
 
         return {
-            "monthly_savings": round(saved, 2),
+            "monthly_savings": round(float(saved), 2),
             "suggested_budgets": alloc["suggested_budgets"],
             "savings_routing": alloc["savings_routing"],
             "goals": timelines,

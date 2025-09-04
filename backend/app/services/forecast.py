@@ -1,11 +1,12 @@
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.services.aggregates import spend_by_preset, spend_last_n_months_by_preset, personal_baseline, z_score
 from app.services.inherit import cpi_map_for_month
+import random
 
 try:
     from sklearn.ensemble import IsolationForest
@@ -108,3 +109,32 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
         return rows 
     finally:
         db.close()
+
+
+def projected_goal_dates_p50_p80(monthly_net_series: list[float], current_balance: float, target_amount: float) -> dict:
+    if target_amount <= current_balance:
+        today = date.today()
+        return {"p50": today, "p80": today}
+
+    base = monthly_net_series or [0.0]
+    trials, horizon = 200, 18
+    completions = []
+    for _ in range(trials):
+        bal = current_balance
+        months = 0
+        while bal < target_amount and months < horizon:
+            bal += random.choice(base) * 0.9  
+            months += 1
+        if bal >= target_amount:
+            completions.append(months)
+    if not completions:
+        return {"p50": None, "p80": None}
+
+    completions.sort()
+    def add_months(d: date, m: int) -> date:
+        return d + timedelta(days=round(m * 30.4))
+
+    today = date.today()
+    p50 = completions[len(completions)//2]
+    p80 = completions[max(0, int(len(completions)*0.8) - 1)]
+    return {"p50": add_months(today, p50), "p80": add_months(today, p80)}
