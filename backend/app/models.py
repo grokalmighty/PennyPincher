@@ -22,7 +22,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
-    account_id = Column(Integer)
+    account_id = Column(Integer, ForeignKey("accounts.id"))
     posted_at = Column(Date)
     amount = Column(Float)
     currency = Column(String)
@@ -30,6 +30,7 @@ class Transaction(Base):
     mcc = Column(String, nullable=True)
     preset_category = Column(String)
     user_category = Column(String, nullable=True)
+    classification_source = Column(String, nullable=True)
 
 class Budget(Base):
     __tablename__ = "budgets"
@@ -59,8 +60,10 @@ class MerchantRule(Base):
     __tablename__= "merchant_rules"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, index=True)
-    merchant_pattern = Column(String)
-    user_category_id = Column(Integer, ForeignKey("user_categories.id"))
+    pattern = Column(String, nullable=False)
+    user_category = Column(String, nullable=False)
+    parent_preset = Column(String, nullable=False)
+    priority = Column(Integer, default=100)
 
 class Goal(Base):
     __tablename__ = "goals"
@@ -82,7 +85,7 @@ class TxnOverride(Base):
 
 class CompanyRule(Base):
     __tablename__ = "company_rules"
-    id = Column(Integer, primary_key=True, autoincreiment=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, index=True, nullable=False)
     company = Column(String, nullable=False)
     category = Column(String, nullable=False)
