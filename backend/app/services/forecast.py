@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
-from app.services.aggregates import spend_by_preset, spend_last_n_months_by_preset, personal_baseline, z_score
+from app.services.aggregates import spend_by_preset, spend_last_n_months_by_preset, personal_baseline, z_score, txns_recent_months, txns_in_month_by_preset, detect_recurring
 from app.services.inherit import cpi_map_for_month
 import random
 
@@ -95,6 +95,25 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
             mean_hist = (sum(history_series) / len(history_series)) if history_series else None
             feedback = _make_feedback(preset, actual, forecast, mean_hist)
 
+            try:
+                recent = txns_recent_months(user_id, month, n=6, parent_preset=preset)
+                rec_map = detect_recurring(recent)  
+
+                cur_tx = txns_in_month_by_preset(user_id, month, preset)
+                rec_sum = 0.0
+                for t in cur_tx:
+                    mname = (t.get("merchant_norm") or "").strip()
+                    if mname in rec_map:
+                        rec_sum += float(t.get("amount") or 0.0)
+                recurring_coverage = (rec_sum / actual) if actual > 1e-6 else 0.0
+            except Exception:
+                rec_map = {}
+                recurring_coverage = 0.0
+
+            if recurring_coverage >= 0.70 and anomaly:
+                anomaly = False
+                feedback = f"{preset} appears mostly recurring (~{recurring_coverage*100:.0f}%). Spike likely from billing timing or contract changes."
+            
             rows.append({
                 "category": preset,
                 "last_month_spent": round(last_spent, 2),
@@ -104,7 +123,9 @@ def forecast_table(user_id: int, month: str) -> list[dict]:
                 "anomaly": bool(anomaly),
                 "feedback": feedback,
                 "baseline_ema": round(stats.get("ema", 0.0), 2),
-                "z_score": round(z, 2)
+                "z_score": round(z, 2),
+                "recurring_merchants": len(rec_map),
+                "recurring_coverage": round(recurring_coverage, 2),
             })
         return rows 
     finally:
