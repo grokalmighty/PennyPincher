@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Date, Boolean, ForeignKey, DateTime, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from .db import Base
 
@@ -61,3 +61,30 @@ class MerchantRule(Base):
     user_id = Column(Integer, index=True)
     merchant_pattern = Column(String)
     user_category_id = Column(Integer, ForeignKey("user_categories.id"))
+
+class Goal(Base):
+    __tablename__ = "goals"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    target_amount = Column(Float, nullable=False)
+    current_amount = Column(Float, default=0.0)
+    target_date = Column(Date, nullable=True)
+    priority = Column(Integer, default=1)
+    active = Column(Boolean, default=True)
+
+class TxnOverride(Base):
+    __tablename__ = "txn_overrides"
+    txn_id = Column(Integer, ForeignKey("transactions.id"), primary_key=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    category = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+class CompanyRule(Base):
+    __tablename__ = "company_rules"
+    id = Column(Integer, primary_key=True, autoincreiment=True)
+    user_id = Column(Integer, index=True, nullable=False)
+    company = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    priority = Column(Integer, default=100)
+    __table_args__ = (UniqueConstraint("user_id", "company", name="uix_user_company"),)
