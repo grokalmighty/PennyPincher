@@ -1,6 +1,13 @@
+import random
 from app.db import SessionLocal
 from app.models import Budget
 from app.services.aggregates import spend_by_preset, spend_by_subcat 
+
+NUDGES = [
+    {"id": "lower_cap",    "tpl": "Lower {preset} cap by ${delta}."},
+    {"id": "shift_to_goal","tpl": "Shift ${delta} to {goal}."},
+    {"id": "weekly_cap",   "tpl": "Set a ${delta}/week limit on {preset}."},
+]
 
 def parse_key(cat: str):
     if ":" in cat:
@@ -82,3 +89,41 @@ def budget_status_inherited(user_id: int, month: str):
                 "status": o_status
             })
     return rows 
+
+def _choose_nudge(history_perf: dict[str, float] | None) -> dict:
+    if not history_perf or random.random() < 0.1:
+        return random.choice(NUDGES)
+    best_id = max(history_perf.items(), key=lambda kv: kv[1])[0]
+    return next(n for n in NUDGES if n["id"] == best_id)
+
+def compose_insights(user_id: int, month: str) -> list[dict]:
+    from app.services.forecast import forecast_table
+    rows = forecast_table(user_id, month)
+    if not rows:
+        return []
+
+    r = max(rows, key=lambda x: abs((x.get("actual_spent") or 0) - (x.get("forecast") or 0)))
+    delta = float((r.get("actual_spent") or 0) - (r.get("forecast") or 0))
+    delta_abs = int(abs(delta))
+
+    nudge = _choose_nudge(None) 
+    payload = {"preset": r["category"], "delta": max(10, delta_abs // 2)}
+
+    card = {
+        "title": f"Variance in {r['category']}",
+        "body": f"Δ ${delta_abs:.0f} vs forecast. {nudge['tpl'].format(preset=r['category'], goal='Emergency Fund', delta=payload['delta'])}",
+        "cta": {"label": "Apply suggestion", "action": nudge["id"], "payload": payload},
+        "impact_estimate_monthly": delta_abs,
+        "source_ref": {
+            "method": "variance_v1",
+            "inputs": {
+                "actual": r.get("actual_spent"),
+                "forecast": r.get("forecast"),
+                "baseline_ema": r.get("baseline_ema"),
+                "z_score": r.get("z_score"),
+                "recurring_coverage": r.get("recurring_coverage"),
+            }
+        }
+    }
+
+    return [card]
