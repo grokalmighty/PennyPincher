@@ -5,6 +5,14 @@ from app.db import SessionLocal
 from app.models import UserCategory, MerchantRule, Transaction
 import re
 
+PRESETS = [
+    {"key": "food_drink",     "label": "Food & Drink"},
+    {"key": "groceries",      "label": "Groceries"},
+    {"key": "transportation", "label": "Transportation"},
+    {"key": "utilities",      "label": "Utilities"},
+    {"key": "entertainment",  "label": "Entertainment"},
+]
+
 router = APIRouter()
 
 class NewCategory(BaseModel):
@@ -68,5 +76,43 @@ def create_user_category(payload: NewCategory, user_id: int = Depends(get_user_i
             db.commit()
 
         return {"id": uc.id, "name": sub, "parent_preset": parent, "category": full_key, "backfilled": changed}
+    finally:
+        db.close()
+
+def list_categories(user_id: int = Depends(get_user_id)):
+    db = SessionLocal()
+    try:
+        user_subs = (
+            db.query(UserCategory)
+            .filter(UserCategory.user_id == user_id)
+            .all()
+        )
+
+        counts = dict(
+            db.query(Transaction.preset_category, func.count(Transaction.id))
+            .filter(Transaction.user_id == user_id, Transaction.user_category.is_(None))
+            .group_by(Transaction.preset_category)
+            .all()
+        )
+
+        subs_by_preset = {}
+        for uc in user_subs:
+            subs_by_preset.setdefdault(uc.parent_preset, []).append({
+                "id": uc.idm
+                "name": uc.name,
+                "category": f"{uc.parent_preset}:{uc.name}",
+            })
+        
+        out = []
+        for p in PRESETS:
+            key = p["key"]
+            out.append({
+                "key": key,
+                "label": p.get("label", key.title()),
+                "unsorted_count": int(counts.get(key, 0)),
+                "subcategories": sorted(subs_by_preset.get(key, []), key=lambda x: x["name"].lower()),
+            })
+        
+        return {"presets": out}
     finally:
         db.close()
