@@ -8,7 +8,7 @@ def month_range(month: str) -> tuple[date, date]:
 
     # Next month
     if start.month == 12:
-        next = date(start.year + 1, 1, 1)
+        nxt = date(start.year + 1, 1, 1)
     else:
         nxt = date(start.year, start.month + 1, 1)
     end = nxt - timedelta(days=1)
