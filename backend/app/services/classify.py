@@ -1,12 +1,12 @@
 import re
-from __future__ import annotatoins
+from __future__ import annotations
 from typing import Dict, Tuple, Iterable, Optional, List
 from sqlalchemy.orm import Session
 from app.models import Transaction, TxnOverride, CompanyRule, MerchantRule
 
 _company_clean = re.compile(r"[^a-z0-9]+")
 def canonicalize(name: Optional[str]) -> str:
-    return _company_clean.sub ("", (name or "").lower()).strip()
+    return _company_clean.sub("", (name or "").lower()).strip()
 
 def load_compiled_regex_rules(db: Session, user_id: int):
     from app.models import MerchantRule, UserCategory
@@ -39,10 +39,11 @@ def apply_single_classification(
         .first()
     )
     if ov:
+        setattr(tx, "classification_source", "txn_override")
         return ov.category
     
     # Company rule 
-    key = canonicalize(tx.merchant_alias or tx.merchant_norm or "")
+    key = canonicalize(tx.merchant_norm or "")
     if key:
         cr = (
             db.query(CompanyRule)
@@ -50,6 +51,7 @@ def apply_single_classification(
             .first()
         )
         if cr:
+            setattr(tx, "classification_source", "company_rule")
             return cr.category
     
     # Regex rulesssss
@@ -58,9 +60,11 @@ def apply_single_classification(
         parent = tx.preset_category or ""
         for pat, subcat, parent_preset in compiled_regex_rules:
             if parent == parent_preset and pat.search(mnorm):
+                setattr(tx, "classification_source", "merchant_rule")
                 return subcat
         
     # fallback
+    setattr(tx, "classification_source", "preset")
     return None
 
 # Batch classification
@@ -73,7 +77,7 @@ def classify_batch_for_user(
         txns = (
             db.query(Transaction)
             .filter(Transaction.user_id == user_id)
-            .order_by(Transaction.date.asc())
+            .order_by(Transaction.posted_at.asc())
             .all()
         )
     
