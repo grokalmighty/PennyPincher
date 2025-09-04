@@ -4,6 +4,7 @@ import re
 from typing import Dict, Tuple, Iterable, Optional, List
 from sqlalchemy.orm import Session
 from app.models import Transaction, TxnOverride, CompanyRule, MerchantRule
+from collections import defaultdict, Counter
 
 _company_clean = re.compile(r"[^a-z0-9]+")
 def canonicalize(name: Optional[str]) -> str:
@@ -66,6 +67,10 @@ def apply_single_classification(
         
     # fallback
     setattr(tx, "classification_source", "preset")
+    cat, conf = _LEARNER.predict(tx.merchant_norm)
+    if conf >= 0.6 and cat != "uncategorized":
+        setattr(tx, "classification_source", "ml_fallback_merchant_mode")
+        return cat
     return None
 
 # Batch classification
@@ -85,6 +90,8 @@ def classify_batch_for_user(
     rules = load_compiled_regex_rules(db, user_id=user_id)
     considered = reclassified = 0 
 
+    _LEARNER.fit_from_labels(db, user_id) 
+
     for tx in txns:
         considered += 1 
         chosen = apply_single_classification(db, user_id, tx, rules)
@@ -101,3 +108,29 @@ def classify_on_ingest(db: Session, user_id: int, tx: Transaction) -> None:
     chosen = apply_single_classification(db, user_id, tx, rules)
     if chosen:
         tx.user_category = chosen
+
+class MerchantLearner:
+    def __init__(self):
+        self.label_counts = defaultdict(Counter)  # merchant_norm -> Counter(category)
+
+    def fit_from_labels(self, db: Session, user_id: int):
+        rows = (
+            db.query(Transaction.merchant_norm, Transaction.user_category)
+              .filter(Transaction.user_id == user_id, Transaction.user_category.isnot(None))
+              .all()
+        )
+        for m, cat in rows:
+            if not m or not cat: 
+                continue
+            self.label_counts[canonicalize(m)][cat] += 1
+
+    def predict(self, merchant_norm: Optional[str]) -> tuple[str, float]:
+        key = canonicalize(merchant_norm or "")
+        counts = self.label_counts.get(key)
+        if not counts:
+            return ("uncategorized", 0.0)
+        cat, c = counts.most_common(1)[0]
+        total = sum(counts.values())
+        return (cat, c / max(1, total))
+
+_LEARNER = MerchantLearner()
