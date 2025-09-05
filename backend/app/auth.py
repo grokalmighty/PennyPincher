@@ -4,7 +4,6 @@ from fastapi import Depends, Header, HTTPException
 JWT_SECRET = os.getenv("JWT_SECRET", "devsecret")
 ALGO = "HS256"
 
-"""Create JWT for given user_id"""
 def make_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id), # Token must be a string 
@@ -13,7 +12,6 @@ def make_token(user_id: int) -> str:
 
     return jwt.encode(payload, JWT_SECRET, algorithm=ALGO)
 
-"""Extract user_id from token or raise 401"""
 def get_user_id(authorization: str = Header(None)) -> int:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")

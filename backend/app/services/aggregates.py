@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from sqlalchemy import func, and_
 from app.db import SessionLocal
 from app.models import Transaction
@@ -99,7 +99,8 @@ def _ema(values: list[float], alpha: float = 0.3) -> float:
     return ema
 
 def _ema_std(values: list[float], alpha: float = 0.3) -> float:
-    if not values: return 0.0
+    if not values: 
+        return 0.0
     mean = values[0]
     var = 0.0
     for v in values[1:]:
@@ -116,10 +117,6 @@ def personal_baseline(series: list[float]) -> dict:
 def z_score(current: float, ema: float, std: float) -> float:
     if std <= 1e-6: return 0.0
     return (current - ema) / std
-
-
-from collections import defaultdict
-from statistics import median
 
 def txns_recent_months(user_id: int, month: str, n: int = 6, parent_preset: str | None = None) -> list[dict]:
     from sqlalchemy import and_

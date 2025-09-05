@@ -11,22 +11,17 @@ def canonicalize(name: Optional[str]) -> str:
     return _company_clean.sub("", (name or "").lower()).strip()
 
 def load_compiled_regex_rules(db: Session, user_id: int):
-    from app.models import MerchantRule, UserCategory
-    rules = (
-        db.query(MerchantRule, UserCategory)
-        .join(UserCategory, MerchantRule.user_category_id == UserCategory.id)
-        .filter(MerchantRule.user_id == user_id)
-        .all()
-    )
-    out = []
-    for mr, uc in rules:
-        try:
-            pat = re.compile(mr.merchant_pattern, re.IGNORECASE)
-            full_key = f"{uc.parent_preset}:{uc.name}"
-            out.append((pat, full_key, uc.parent_preset))
-        except re.error:
-            continue
-    return out
+    # rules = db.query(MerchantRule).filter(MerchantRule.user_id == user_id).all()
+    # out = []
+    # for mr in rules:
+    #     try:
+    #         pat = re.compile(mr.pattern, re.IGNORECASE)
+    #         full_key = mr.user_category if ":" in mr.user_category else f"{mr.parent_preset}:{mr.user_category}"
+    #         out.append((pat, full_key, mr.parent_preset))
+    #     except re.error:
+    #         continue
+    # return out
+    return []
 
 def apply_single_classification(
         db: Session,

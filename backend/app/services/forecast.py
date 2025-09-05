@@ -52,7 +52,7 @@ def _make_feedback(category: str, actual: float, forecast: float, mean_hist: flo
         )
     if forecast and actual <= forecast * 0.75:
         saved = forecast - actual
-        return f"Nice! {category} came in ${saved:0.f} under forecast this month."
+        return f"Nice! {category} came in ${saved:.0f} under forecast this month."
     if mean_hist and actual > mean_hist * 1.2:
         bump = actual - mean_hist
         return f"{category} is trending high (+{bump:.0f} vs typical). A small adjustment could help."
