@@ -28,3 +28,6 @@ export TOKEN=$(./scripts/mint_token.sh)
 ./scripts/pinch_live_demo.sh
 # or the one-button flow:
 ./scripts/demo_all.sh
+
+# Video link:
+# https://drive.google.com/file/d/18e8EPoI0wIyZ2j8pDrZEJkKxomexUKeN/view?usp=drive_link
