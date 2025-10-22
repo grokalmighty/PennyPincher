@@ -4,7 +4,7 @@ import statistics
 class GoalTracker:
     def calculate_goal_progress(self, account):
         """Track progress for goal accounts with deadlines"""
-        if account.type.value != 'goal' or not account.deadline:
+        if account.value != 'goal' or not account.deadline:
             return None
 
         try:

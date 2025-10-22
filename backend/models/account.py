@@ -15,7 +15,7 @@ class Account:
                  current_balance=0):
         self.id = account_id
         self.name = name
-        self.type = AccountType(account_type)
+        self.type = account_type
         self.folder_id = folder_id
         self.monthly_budget = float(monthly_budget)
         self.target_amount = float(target_amount)
@@ -62,7 +62,7 @@ class Account:
         return {
             'id': self.id,
             'name': self.name,
-            'type': self.type.value,
+            'type': self.type,
             'folder_id': self.folder_id,
             'monthly_budget': self.monthly_budget,
             'target_amount': self.target_amount,
