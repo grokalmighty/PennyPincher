@@ -55,45 +55,45 @@ const FolderManager = ({ onDataUpdate }) => {
                                     value={formData.name}
                                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                                     required
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Description</label>
-                                    <input
-                                        type="text"
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({...formData, description: e.target.value})}
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label>Icon</label>
-                                        <div className="icon-grid">
-                                            {icons.map(icon => (
-                                                <button
-                                                    key={icon}
-                                                    type="button"
-                                                    className={`icon-btn ${formData.icon === icon ? 'selected' : ''}`}
-                                                    onClick={() => setFormData({...formData, icon})}
-                                                >
-                                                    {icon}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="form-actions">
-                                        <button type="button" onClick={() => setShowForm(false)}>
-                                            Cancel
-                                        </button>
-                                        <button type="submit" className="btn-primary">
-                                            Create Folder
-                                        </button>
-                                    </div>
-                                </form>
+                                />
                             </div>
+
+                            <div className="form-group">
+                                <label>Description</label>
+                                <input
+                                    type="text"
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Icon</label>
+                                <div className="icon-grid">
+                                    {icons.map(icon => (
+                                        <button
+                                            key={icon}
+                                            type="button"
+                                            className={`icon-btn ${formData.icon === icon ? 'selected' : ''}`}
+                                            onClick={() => setFormData({...formData, icon})}
+                                        >
+                                            {icon}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="form-actions">
+                                <button type="button" onClick={() => setShowForm(false)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-primary">
+                                    Create Folder
+                                </button>
+                            </div>
+                        </form>
                     </div>
+                </div>
             )}
         </div>
     )
