@@ -31,7 +31,7 @@ class TimeAnalyzer:
         # Day of week analysis
         day_insight = self._analyze_day_of_week(transactions)
         if day_insight:
-            insights['date_of_week'] = day_insight
+            insights['day_of_week'] = day_insight
         
         # Spending velocity
         velocity_insight = self._analyze_spending_velocity(transactions)
@@ -40,7 +40,7 @@ class TimeAnalyzer:
         
         return insights if insights else None
 
-    def _analyze_time_if_day(self, transactions):
+    def _analyze_time_of_day(self, transactions):
         time_totals = {bucket: 0 for bucket in self.time_buckets}
         time_counts = {bucket: 0 for bucket in self.time_buckets}
 
@@ -112,7 +112,7 @@ class TimeAnalyzer:
 
         # Sort by date and calculate intervals 
         sorted_transactions = sorted(transactions, key=lambda x: x.date)
-        dates = [datetime.formisoformat(t.date) for t in sorted_transactions]
+        dates = [datetime.fromisoformat(t.date) for t in sorted_transactions]
 
         intervals = []
         for i in range(1, len(dates)):
@@ -135,5 +135,5 @@ class TimeAnalyzer:
             'average_days_between': round(avg_interval, 1),
             'consistency': round(consistency, 2),
             'pattern': pattern,
-            'message': f"{pattern.capitalize()} spending (every {avg_interval:.1d} days)"
+            'message': f"{pattern.capitalize()} spending (every {avg_interval:.1f} days)"
         }

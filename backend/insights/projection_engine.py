@@ -28,7 +28,7 @@ class ProjectionEngine:
             return 0
         
         # Use last 30 days for calculation
-        cutoff_date = datetime.now() - timedelta(daus=30)
+        cutoff_date = datetime.now() - timedelta(days=30)
         recent_expenses = [
             t for t in expenses
             if datetime.fromisoformat(t.date) >= cutoff_date

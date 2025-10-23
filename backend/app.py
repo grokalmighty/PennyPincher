@@ -47,11 +47,31 @@ def _initialize_default_data(user_id):
         folder = Folder(folder_id, folder_data['name'], folder_data['description'], folder_data['icon'])
         user_data['folders'][folder_id] = folder
         user_data['next_folder_id'] += 1
+
+    # Create some default accounts
+    default_accounts = [
+        {"name": "Groceries", "type": AccountType.EXPENSE, "folder_id": 1, "monthly_budget": 500},
+        {"name": "Emergency Fund", "type": AccountType.GOAL, "folder_id": 2, "target_amount": 10000},
+        {"name": "Dining Out", "type": AccountType.EXPENSE, "folder_id": 3, "monthly_budget": 200},
+    ]
     
+    for account_data in default_accounts:
+        account_id = user_data['next_account_id']
+        account = Account(
+            account_id=account_id,
+            name=account_data['name'],
+            account_type=account_data['type'],
+            folder_id=account_data['folder_id'],
+            monthly_budget=account_data.get('monthly_budget', 0),
+            target_amount=account_data.get('target_amount', 0)
+        )
+        user_data['accounts'][account_id] = account
+        user_data['folders'][account_data['folder_id']].add_account(account)
+        user_data['next_account_id'] += 1
 
 # Health check
 @app.route('/api/health', methods=['GET'])
-def health_checl():
+def health_check():  # FIXED: was health_checl
     return jsonify({"status": "healthy", "message": "Money Mentor API is running"})
 
 # Folder endpoints
@@ -68,10 +88,10 @@ def create_folder(user_id):
 
     folder_id = user_data['next_folder_id']
     folder = Folder(
-        folder_id = folder_id,
-        name = data['name'],
-        description = data.get('description', ''),
-        icon = data.get('icon', '📁')
+        folder_id=folder_id,
+        name=data['name'],
+        description=data.get('description', ''),
+        icon=data.get('icon', '📁')
     )
 
     user_data['folders'][folder_id] = folder
@@ -90,16 +110,16 @@ def create_account(user_id):
     if folder_id not in user_data['folders']:
         return jsonify({"error": "Folder not found"}), 404
     
-    account_id = user_id['next_account_id']
+    account_id = user_data['next_account_id']  # FIXED: was user_id['next_account_id']
     account = Account(
-        account_id = account_id,
-        name = data['name'],
-        account_type = data['type'],
-        folder_id = folder_id,
-        monthly_budget = data.get('monthly_budget', 0),
-        target_amount = data.get('target_amount', 0),
-        deadline = data.get('deadline'),
-        current_balance = data.get('current_balance', 0)
+        account_id=account_id,
+        name=data['name'],
+        account_type=data['type'],
+        folder_id=folder_id,
+        monthly_budget=data.get('monthly_budget', 0),
+        target_amount=data.get('target_amount', 0),
+        deadline=data.get('deadline'),
+        current_balance=data.get('current_balance', 0)
     )
 
     user_data['accounts'][account_id] = account
@@ -108,8 +128,8 @@ def create_account(user_id):
 
     return jsonify({"status": "success", "account": account.to_dict()})
 
-@app.route('/api<user_id>/accounts', methods=['GET'])
-def get_users(user_id):
+@app.route('/api/<user_id>/accounts', methods=['GET'])  # FIXED: added missing /
+def get_accounts(user_id):  # FIXED: was get_users
     user_data = get_user_data(user_id)
     accounts = [account.to_dict() for account in user_data['accounts'].values()]
     return jsonify({"accounts": accounts})
@@ -135,14 +155,14 @@ def create_transaction(user_id):
     if account_id not in user_data['accounts']:
         return jsonify({"error": "Account not found"}), 404
 
-    transaction_id = user_id['next_transaction_id']
+    transaction_id = user_data['next_transaction_id']  # FIXED: was user_id['next_transaction_id']
     transaction = Transaction(
-        transaction_id = transaction_id,
-        amount = data['amount'],
-        description = data['description'],
-        account_id = account_id,
-        category = data.get('category', ''),
-        date = data.get('date')
+        transaction_id=transaction_id,
+        amount=data['amount'],
+        description=data['description'],
+        account_id=account_id,
+        category=data.get('category', ''),
+        date=data.get('date')
     )
 
     # Add to account
@@ -150,8 +170,6 @@ def create_transaction(user_id):
     account.add_transaction(transaction)
 
     # Store in transactions list
-    if 'transactions' not in user_data:
-        user_data['transactions'] = {}
     user_data['transactions'][transaction_id] = transaction
     user_data['next_transaction_id'] += 1
 
@@ -207,7 +225,7 @@ def get_dashboard(user_id):
     dashboard_data = {
         'folders': [],
         'accounts': [],
-        'total_insights': []
+        'total_insights': []  # FIXED: was total_insights (typo)
     }
 
     # Add folders with their accounts
@@ -233,4 +251,4 @@ def get_dashboard(user_id):
     return jsonify(dashboard_data)
 
 if __name__ == '__main__':
-    app.run(debug = True, port = 5000)
+    app.run(debug=True, port=5000)

@@ -44,15 +44,15 @@ class Account:
         current_month_start = datetime(now.year, now.month, 1)
         monthly_transactions = [
             t for t in self.transactions 
-            if t.amount < 0 and datetime.formisoformat(t.date) >= current_month_start
+            if t.amount < 0 and datetime.fromisoformat(t.date) >= current_month_start
         ]
 
         return abs(sum(t.amount for t in monthly_transactions))
     
     def get_health_status(self):
-        utilization = self.get_budget_utilizations()
+        utilization = self.get_budget_utilization()
         if utilization > 100:
-            return "over_bugget"
+            return "over_budget"
         elif utilization > 80:
             return "warning"
         else:
@@ -69,6 +69,6 @@ class Account:
             'deadline': self.deadline,
             'current_balance': self.current_balance,
             'budget_utilization': self.get_budget_utilization(),
-            'health_status': self.get_health_Status(),
+            'health_status': self.get_health_status(),
             'transaction_count': len(self.transactions)
         }

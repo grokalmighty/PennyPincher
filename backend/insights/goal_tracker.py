@@ -48,7 +48,7 @@ class GoalTracker:
             }
         
         except Exception as e:
-            print(f"Error caculating goal progress: {e}")
+            print(f"Error calculating goal progress: {e}")
             return None
     
     def _calculate_actual_monthly(self, account):
@@ -70,7 +70,7 @@ class GoalTracker:
             # Use all contributions if none in last 3 months
             recent_contributions = income_transactions
         
-        total_contributions = sum(t.amout for t in recent_contributions)
+        total_contributions = sum(t.amount for t in recent_contributions)
 
         # Calculate days covered and covert to monthly rate
         dates = [datetime.fromisoformat(t.date) for t in recent_contributions]

@@ -1,12 +1,12 @@
 class Folder:
     def __init__(self, folder_id, name, description="", icon="📁"):
-        self.id == folder_id
+        self.id = folder_id
         self.name = name
-        self.descroption = description
+        self.description = description
         self.icon = icon
         self.accounts = []
     
-    def add_count(self, account):
+    def add_account(self, account):
         self.accounts.append(account)
     
     def to_dict(self):
